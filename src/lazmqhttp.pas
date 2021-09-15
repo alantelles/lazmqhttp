@@ -8,7 +8,7 @@ uses
   Classes, SysUtils;
 
 type
-  TPayloadEncoding = (peString, peBase64);
+  TAckMode = (ackRequeueTrue, rejectRequeueTrue, ackRequeueFalse, rejectRequeueFalse);
 
   TLazMqHttpClient = class
     private
@@ -16,13 +16,18 @@ type
       FQueue: string;
       FRoutingKey: string;
       FVhost: string;
+      FUsername: string;
+      FPassword: string;
+      FHost: string;
+      function DoRequest(AUrl, APayload: string):string;
     public
       property Exchange: string read FExchange write FExchange;
       property Queue: string read FQueue write FQueue;
       property RoutingKey: string read FRoutingKey write FRoutingKey;
       property VHost: string read FVhost write FVhost;
-      constructor Create(AExchange: string; AQueue: string; ARoutingKey: string; AVhost: string);
+      constructor Create(Ahost: string; AUSername: string; APassword: string);
       function Publish(Payload: string; PayloadEncodingIsString: boolean=True): boolean;
+      function Consume(Ackmode: TAckMode; Count: integer; AsBase64: boolean=False; Truncate: integer = -1): string;
   end;
 
 
@@ -30,12 +35,16 @@ implementation
 
 uses fphttpclient, StrUtils;
 
-constructor TLazMqHttpClient.Create(AExchange: string; AQueue: string; ARoutingKey: string; AVhost: string);
+constructor TLazMqHttpClient.Create(Ahost: string; AUSername: string; APassword: string);
 begin
-  FExchange := AExchange;
-  FQueue := AQueue;
-  FRoutingKey := ARoutingKey;
-  FVhost := AVhost;
+  Fhost := Ahost;
+  FPassword := APassword;
+  FUSername := AUsername;
+end;
+
+function TLazMqHttpClient.Consume(Ackmode: TAckMode; Count: integer; AsBase64: boolean=False; Truncate: integer = -1): string;
+begin
+
 end;
 
 function TLazMqHttpClient.Publish(Payload: string; PayloadEncodingIsString: boolean=True): boolean;
@@ -44,17 +53,21 @@ var
   StrStream: TStringStream;
   Response, FullPayload: string;
   PayloadAsString: string = 'base64';
+  PostUrl: string;
 begin
   HttpClient := TFPHttpClient.Create(nil);
-  HttpClient.UserName := 'guest';
-  HttpClient.Password := 'guest';
+  HttpClient.UserName := FUsername;
+  HttpClient.Password := FPassword;
   if PayloadencodingIsString then
     PayloadAsString := 'string';
   FullPayload := '{"properties": {}, "routing_key": "' + FRoutingKey + '", "payload": "' + ReplaceStr(Payload, '"', '\"') + '", "payload_encoding" : "' + PayloadAsString + '"}';
   StrStream := TStringStream.Create(FullPayload);
   HttpClient.RequestBody := StrStream;
   HttpClient.AddHeader('Content-Type', 'application/json');
-  Response := HttpClient.Post('http://localhost:15672/api/exchanges/' + FVhost + '/' + FExchange + '/publish');
+  PostUrl := FHost + '/api/exchanges/' + FVhost + '/' + FExchange + '/publish';
+  Response := HttpClient.Post(PostUrl);
+  StrStream.Free;
+  Httpclient.Free;
   if Response = '{"routed":true}' then
     Result := True
   else
