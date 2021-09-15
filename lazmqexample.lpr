@@ -17,7 +17,8 @@ begin
   Cli.Queue := 'local.libdev.queue';
   Cli.Exchange := 'lazmqdevexc';
   Cli.VHost := 'lazmqdevhost';
-  writeln(Cli.Publish('now time is any'));
+  writeln(Cli.Publish('now time is other'));
+  writeln(Cli.Consume(ackRequeueTrue, 5));
   Cli.Free;
 end.
 
