@@ -20,6 +20,7 @@ type
       FPassword: string;
       FHost: string;
       function DoRequest(AUrl, APayload: string):string;
+      function GetAckModeAsString(Ackmode: TAckmode): string;
     public
       property Exchange: string read FExchange write FExchange;
       property Queue: string read FQueue write FQueue;
@@ -27,8 +28,7 @@ type
       property VHost: string read FVhost write FVhost;
       constructor Create(Ahost: string; AUSername: string; APassword: string);
       function Publish(Payload: string; PayloadEncodingIsString: boolean=True): boolean;
-      function Consume(Ackmode: TAckMode; Count: integer; AsBase64: boolean=False; Truncate: integer = -1): string;
-      function GetAckModeAsString(Ackmode: TAckmode): string;
+      function Consume(Ackmode: TAckMode=ackRequeueTrue; Count: integer=1; AsBase64: boolean=False; Truncate: integer = -1): string;
   end;
 
 
@@ -44,8 +44,18 @@ begin
 end;
 
 function TLazMqHttpClient.GetAckModeAsString(AckMode: TAckmode): string;
+var
+  AsString: string;
 begin
-
+  case Ackmode of
+    ackRequeueTrue : AsString := 'ack_requeue_true';
+    rejectRequeueTrue : AsString := 'reject_requeue_true';
+    ackRequeueFalse : AsString := 'ack_requeue_false';
+    rejectRequeueFalse : AsString := 'reject_requeue_false';
+  else
+     AsString := 'reject_requeue_true';
+  end;
+  Result := AsString;
 end;
 
 function TLazMqHttpClient.DoRequest(AUrl, APayload: string): string;
@@ -75,14 +85,15 @@ end;
 
 function TLazMqHttpClient.Consume(Ackmode: TAckMode=ackRequeueTrue; Count: integer=1; AsBase64: boolean=False; Truncate: integer = -1): string;
 var
-  Response, FullPayload: string;
-  PostUrl: string
+  FullPayload: string;
+  PostUrl: string;
   Encoding: string = 'auto';
 begin
   PostUrl := 'queues/' + FVhost + '/' + FQueue + '/get';
   if AsBase64 then
     Encoding := 'base64';
-  FullPayload := '{"count":' + IntToStr(Count) + ',"ackmode":"ack_requeue_true","encoding":"' + Encoding + '"}';
+  FullPayload := '{"count":' + IntToStr(Count) + ',"ackmode":"' + GetAckModeAsString(AckMode) + '","encoding":"' + Encoding + '"}';
+  Result := DoRequest(PostUrl, FullPayload);
 end;
 
 function TLazMqHttpClient.Publish(Payload: string; PayloadEncodingIsString: boolean=True): boolean;
@@ -92,7 +103,7 @@ var
   PostUrl: string;
 begin
   if PayloadencodingIsString then
-    PayloadAsString := 'string';
+    PayloadEncodingAsString := 'string';
   FullPayload := '{"properties": {}, "routing_key": "' + FRoutingKey + '", "payload": "' + ReplaceStr(Payload, '"', '\"') + '", "payload_encoding" : "' + PayloadEncodingAsString + '"}';
   PostUrl := 'exchanges/' + FVhost + '/' + FExchange + '/publish';
   Response := DoRequest(PostUrl, FullPayload);
